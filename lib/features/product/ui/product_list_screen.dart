@@ -45,6 +45,25 @@ class _ProductListScreenState extends State<ProductListScreen> {
     }
   }
 
+  // Di dalam class _ProductListScreenState
+Future<List<Map<String, dynamic>>> _fetchProducts() async {
+  try {
+    var query = _supabase.from('produk').select('*, kategori(namakategori)');
+    
+    // Filter berdasarkan kategori jika bukan "All"
+    if (_selectedCategory != "All") {
+      query = query.eq('kategori.namakategori', _selectedCategory);
+    }
+
+    final data = await query;
+    return List<Map<String, dynamic>>.from(data);
+  } catch (e) {
+    debugPrint("Error fetching products: $e");
+    return [];
+  }
+}
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -169,16 +188,50 @@ class _ProductListScreenState extends State<ProductListScreen> {
                 ],
               ),
             ),
-            
-            const SizedBox(height: 20),
-            // Tempat untuk Grid Produk nantinya
-            const Center(child: Text("Daftar produk akan muncul di sini")),
+           // GANTI GridView lama dengan FutureBuilder ini
+            const SizedBox(height: 25),
+            FutureBuilder<List<Map<String, dynamic>>>(
+              future: _fetchProducts(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                
+                if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return const Center(
+                    child: Text("Tidak ada produk di kategori ini"),
+                  );
+                }
+
+                final products = snapshot.data!;
+
+                return GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 15,
+                    mainAxisSpacing: 15,
+                    childAspectRatio: 0.75,
+                  ),
+                  itemCount: products.length,
+                  itemBuilder: (context, index) {
+                    final item = products[index];
+                    return _buildProductCard(
+                      title: item['namaproduk'] ?? 'Tanpa Nama',
+                      price: "Rp. ${item['harga'] ?? 0}",
+                      stock: "${item['stok'] ?? 0}",
+                      imageUrl: item['gambar'], // URL dari Storage Supabase
+                    );
+                  },
+                );
+              },
+            ),
           ],
         ),
       ),
     );
   }
-
   // Widget bantuan untuk Kategori
   Widget _buildCategoryItem(String title) {
   // Cek apakah judul ini sama dengan kategori yang sedang dipilih
@@ -208,6 +261,90 @@ class _ProductListScreenState extends State<ProductListScreen> {
           ),
         ),
       ),
+    ),
+  );
+}
+Widget _buildProductCard({
+  required String title,
+  required String price,
+  required String stock,
+  String? imageUrl, // Gunakan String nullable
+}) {
+  return Container(
+    decoration: BoxDecoration(
+      color: const Color(0xFFF5F5F5),
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          flex: 3,
+          child: Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: imageUrl != null && imageUrl.isNotEmpty
+                ? Image.network(
+                    imageUrl,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) =>
+                        const Icon(Icons.broken_image, size: 50, color: Colors.grey),
+                  )
+                : const Icon(Icons.image, size: 50, color: Colors.grey),
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: const BoxDecoration(
+            color: AppColors.primaryPurple,
+            borderRadius: BorderRadius.only(
+              bottomLeft: Radius.circular(20),
+              bottomRight: Radius.circular(20),
+            ),
+          ),
+          child: Stack(
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    price,
+                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    "Stok : $stock",
+                    style: const TextStyle(color: Colors.white, fontSize: 11),
+                  ),
+                ],
+              ),
+              if (widget.role.toLowerCase() == 'admin')
+                Positioned(
+                  right: 0,
+                  bottom: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.delete, color: Colors.red, size: 16),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
     ),
   );
 }
