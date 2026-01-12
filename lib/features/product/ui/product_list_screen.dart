@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/app_colors.dart';
+import 'product_detail_screen.dart';
 
 class ProductListScreen extends StatefulWidget {
   final String role;
@@ -295,6 +296,7 @@ Future<void> _deleteProduct(BuildContext context, int id) async {
                     final item = products[index];
                     return _buildProductCard(
                       context: context,      // Kirim context dari builder
+                      item: item,
                       id: item['produkid'],
                       title: item['namaproduk'] ?? 'Tanpa Nama',
                       price: "Rp. ${item['harga'] ?? 0}",
@@ -344,13 +346,24 @@ Future<void> _deleteProduct(BuildContext context, int id) async {
 }
 Widget _buildProductCard({
   required BuildContext context, // Tambahkan context di sini
+  required Map<String, dynamic> item,
   required int id,
   required String title,
   required String price,
   required String stock,
   String? imageUrl, // Gunakan String nullable
 }) {
-  return Container(
+  return GestureDetector(
+    onTap: () {
+      // Navigasi ke Detail dengan membawa data 'item'
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ProductDetailScreen(product: item),
+        ),
+      );
+    },
+    child: Container(
     decoration: BoxDecoration(
       color: const Color(0xFFF5F5F5),
       borderRadius: BorderRadius.circular(20),
@@ -433,6 +446,7 @@ Widget _buildProductCard({
         ),
       ],
     ),
+  ),
   );
 }
 }
