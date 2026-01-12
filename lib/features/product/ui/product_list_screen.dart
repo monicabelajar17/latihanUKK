@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/app_colors.dart';
 import 'product_detail_screen.dart';
+import 'add_product_screen.dart';
 
 class ProductListScreen extends StatefulWidget {
   final String role;
@@ -145,6 +146,22 @@ class _ProductListScreenState extends State<ProductListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      floatingActionButton: widget.role.toLowerCase() == 'admin'
+          ? FloatingActionButton(
+              onPressed: () async {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const AddProductScreen()),
+                );
+                if (result == true) {
+                  setState(() {}); // Refresh list setelah tambah data
+                }
+              },
+              backgroundColor: AppColors.primaryPurple,
+              shape: const CircleBorder(),
+              child: const Icon(Icons.add, color: Colors.pinkAccent, size: 30),
+            )
+          : null,
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
