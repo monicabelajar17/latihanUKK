@@ -58,8 +58,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
   }
 
   Future<void> _saveProduct() async {
+    // 1. Validasi Input
     if (_namaController.text.isEmpty || _hargaController.text.isEmpty || _selectedKategoriId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Mohon lengkapi data")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Mohon lengkapi data (Nama, Harga, dan Kategori)")),
+      );
       return;
     }
 
@@ -68,37 +71,64 @@ class _AddProductScreenState extends State<AddProductScreen> {
     try {
       String? imageUrl;
 
-      // 1. Upload Gambar jika ada
+      // 2. Proses Upload Foto (Sama seperti di Detail Produk)
       if (_selectedImageFile != null || _selectedImageBytes != null) {
-        final fileName = 'prod_${DateTime.now().millisecondsSinceEpoch}.jpg';
-        if (kIsWeb) {
-          await _supabase.storage.from('Produk Image').uploadBinary(fileName, _selectedImageBytes!);
-        } else {
-          await _supabase.storage.from('Produk Image').upload(fileName, _selectedImageFile!);
+        // Buat nama file unik agar tidak bentrok
+        final String fileName = 'prod_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final String path = fileName; // Simpan di root bucket 'Produk Image'
+
+        if (kIsWeb && _selectedImageBytes != null) {
+          // Upload untuk versi WEB
+          await _supabase.storage.from('Produk Image').uploadBinary(
+            path,
+            _selectedImageBytes!,
+            fileOptions: const FileOptions(
+              upsert: true, 
+              contentType: 'image/jpeg'
+            ),
+          );
+        } else if (_selectedImageFile != null) {
+          // Upload untuk versi MOBILE (Android/iOS)
+          await _supabase.storage.from('Produk Image').upload(
+            path,
+            _selectedImageFile!,
+            fileOptions: const FileOptions(
+              upsert: true, 
+              contentType: 'image/jpeg'
+            ),
+          );
         }
-        imageUrl = _supabase.storage.from('Produk Image').getPublicUrl(fileName);
+
+        // 3. Ambil URL Publik setelah berhasil upload
+        imageUrl = _supabase.storage.from('Produk Image').getPublicUrl(path);
       }
 
-      // 2. Insert ke Database
+      // 4. Simpan ke Tabel Produk di Database
       await _supabase.from('produk').insert({
         'namaproduk': _namaController.text.trim(),
-        'harga': double.parse(_hargaController.text),
-        'stok': int.parse(_stokController.text),
+        'harga': double.tryParse(_hargaController.text) ?? 0,
+        'stok': int.tryParse(_stokController.text) ?? 0,
         'kategoriid': _selectedKategoriId,
-        'gambar': imageUrl,
+        'gambar': imageUrl, // Link foto masuk ke kolom gambar
       });
 
       if (mounted) {
-        Navigator.pop(context, true);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Produk berhasil ditambahkan")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Produk & Foto berhasil ditambahkan!"), backgroundColor: Colors.green),
+        );
+        Navigator.pop(context, true); // Kembali dan refresh list
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Terjadi kesalahan: $e")));
+      debugPrint("Error detail: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Gagal menyimpan: $e"), backgroundColor: Colors.red),
+        );
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
-
   @override
   Widget build(BuildContext context) {
     const double imageSize = 180.0;
@@ -108,66 +138,124 @@ class _AddProductScreenState extends State<AddProductScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Container(
-                  height: 220, width: double.infinity,
-                  decoration: const BoxDecoration(
-                    color: AppColors.primaryPurple,
-                    borderRadius: BorderRadius.only(bottomLeft: Radius.circular(100), bottomRight: Radius.circular(100)),
-                  ),
-                ),
-                SafeArea(
-                  child: Row(
-                    children: [
-                      IconButton(icon: const Icon(Icons.arrow_back, color: Colors.white), onPressed: () => Navigator.pop(context)),
-                      const Text("Tambah Produk Baru", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                ),
-                Positioned(
-                  top: 110,
-                  left: (MediaQuery.of(context).size.width - imageSize) / 2,
-                  child: Stack(
-                    children: [
-                      Container(
-                        width: imageSize, height: imageSize,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(30),
-                          boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10)],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(30),
-                          child: _selectedImageBytes != null 
-                            ? Image.memory(_selectedImageBytes!, fit: BoxFit.cover)
-                            : (_selectedImageFile != null 
-                                ? Image.file(_selectedImageFile!, fit: BoxFit.cover)
-                                : const Icon(Icons.image, size: 80, color: Colors.grey)),
+            // BAGIAN HEADER DAN FOTO
+            SizedBox(
+              height: 310, // Memberikan ruang yang cukup untuk foto yang menonjol
+              child: Stack(
+                clipBehavior: Clip.none,
+                alignment: Alignment.center,
+                children: [
+                  // Background Ungu Melengkung
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      height: 220,
+                      decoration: const BoxDecoration(
+                        color: AppColors.primaryPurple,
+                        borderRadius: BorderRadius.only(
+                          bottomLeft: Radius.circular(100),
+                          bottomRight: Radius.circular(100),
                         ),
                       ),
-                      Positioned(
-                        bottom: 5, right: 5,
-                        child: GestureDetector(
-                          onTap: _pickImage,
-                          child: const CircleAvatar(
-                            backgroundColor: AppColors.primaryPurple,
-                            radius: 20,
-                            child: Icon(Icons.camera_alt, color: Colors.white, size: 20),
+                    ),
+                  ),
+                  
+                  // Tombol Back & Judul
+                  Positioned(
+                    top: MediaQuery.of(context).padding.top + 10,
+                    left: 10,
+                    right: 10,
+                    child: Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.arrow_back, color: Colors.white),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                        const Text(
+                          "Tambah Produk Baru",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
+
+                  // WIDGET FOTO & TOMBOL KAMERA (Dipindahkan ke posisi yang aman untuk klik)
+                  Positioned(
+                    top: 110,
+                    child: SizedBox(
+                      width: imageSize,
+                      height: imageSize,
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          // Box Foto
+                          Container(
+                            width: imageSize,
+                            height: imageSize,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(30),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Colors.black12,
+                                  blurRadius: 10,
+                                  spreadRadius: 2,
+                                )
+                              ],
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(30),
+                              child: _selectedImageBytes != null
+                                  ? Image.memory(_selectedImageBytes!, fit: BoxFit.cover)
+                                  : (_selectedImageFile != null
+                                      ? Image.file(_selectedImageFile!, fit: BoxFit.cover)
+                                      : const Icon(Icons.image, size: 80, color: Colors.grey)),
+                            ),
+                          ),
+                          // Tombol Kamera
+                          Positioned(
+                            bottom: -5,
+                            right: -5,
+                            child: GestureDetector(
+                              onTap: () {
+                                debugPrint("Membuka Galeri...");
+                                _pickImage();
+                              },
+                              child: Material(
+                                elevation: 5,
+                                shape: const CircleBorder(),
+                                color: AppColors.primaryPurple,
+                                child: const Padding(
+                                  padding: EdgeInsets.all(12),
+                                  child: Icon(
+                                    Icons.camera_alt,
+                                    color: Colors.white,
+                                    size: 24,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 100),
+
+            // FORM INPUT
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 25),
               child: Column(
                 children: [
+                  const SizedBox(height: 20),
                   _buildField("Nama Produk", _namaController, Icons.shopping_bag_outlined),
                   const SizedBox(height: 15),
                   _buildField("Harga", _hargaController, Icons.attach_money, isNumber: true),
