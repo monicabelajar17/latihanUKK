@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/app_colors.dart';
+import 'receipt_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -138,6 +139,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _buildDisabledField(label: "Password", value: "********", isPassword: true),
                   const SizedBox(height: 15),
                   _buildDisabledField(label: "Sebagai", value: _role),
+
+const SizedBox(height: 40),
+                  SizedBox(
+  width: double.infinity,
+  height: 50,
+  child: OutlinedButton.icon(
+    onPressed: () {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const ReceiptScreen()),
+      );
+    },
+    icon: const Icon(Icons.receipt_long, color: AppColors.primaryPurple),
+    label: const Text("Download Struk", 
+      style: TextStyle(color: AppColors.primaryPurple, fontWeight: FontWeight.bold)),
+    style: OutlinedButton.styleFrom(
+      side: const BorderSide(color: AppColors.primaryPurple),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    ),
+  ),
+),
+
                   const SizedBox(height: 40),
                   SizedBox(
                     width: double.infinity,

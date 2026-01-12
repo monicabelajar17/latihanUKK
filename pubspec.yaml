@@ -30,6 +30,10 @@ environment:
 dependencies:
   supabase_flutter: ^2.0.0
   image_picker: ^1.0.7
+  pdf: ^3.10.8
+  printing: ^5.11.1
+  path_provider: ^2.1.2 # Gunakan versi terbaru
+  open_file: ^3.3.3
   flutter:
     sdk: flutter
 
