@@ -98,7 +98,60 @@ Future<List<Map<String, dynamic>>> _fetchProducts() async {
   }
 }
 
+// Tambahkan parameter 'id' (int)
+Future<void> _deleteProduct(BuildContext context, int id) async {
+  // 1. Tampilkan Dialog Konfirmasi dengan gaya tombol kustom
+  bool confirm = await showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        title: const Text("Konfirmasi Hapus"),
+        content: const Text("Apakah anda yakin ingin menghapus produk ini?"),
+        actions: [
+          // Tombol "Tidak" dengan TextButton abu-abu
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Tidak", style: TextStyle(color: Colors.grey)),
+          ),
+          // Tombol "Ya" dengan ElevatedButton warna Ungu
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryPurple, // Menggunakan warna utama kamu
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20), // Membuat tombol agak bulat
+              ),
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("Ya", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      );
+    },
+  ) ?? false;
 
+  // 2. Eksekusi hapus jika klik "Ya"
+  if (confirm) {
+    try {
+      await _supabase
+          .from('produk')
+          .delete()
+          .eq('produkid', id);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Produk berhasil dihapus')),
+      );
+
+      setState(() {}); // Refresh list produk
+    } catch (e) {
+      debugPrint("Error hapus: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal menghapus: $e')),
+      );
+    }
+  }
+}
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -241,6 +294,8 @@ Future<List<Map<String, dynamic>>> _fetchProducts() async {
                   itemBuilder: (context, index) {
                     final item = products[index];
                     return _buildProductCard(
+                      context: context,      // Kirim context dari builder
+                      id: item['produkid'],
                       title: item['namaproduk'] ?? 'Tanpa Nama',
                       price: "Rp. ${item['harga'] ?? 0}",
                       stock: "${item['stok'] ?? 0}",
@@ -288,6 +343,8 @@ Future<List<Map<String, dynamic>>> _fetchProducts() async {
   );
 }
 Widget _buildProductCard({
+  required BuildContext context, // Tambahkan context di sini
+  required int id,
   required String title,
   required String price,
   required String stock,
@@ -353,17 +410,24 @@ Widget _buildProductCard({
               ),
               if (widget.role.toLowerCase() == 'admin')
                 Positioned(
-                  right: 0,
-                  bottom: 0,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.delete, color: Colors.red, size: 16),
-                  ),
-                ),
+  right: 0,
+  bottom: 0,
+  child: InkWell(
+    onTap: () {
+      // Panggil fungsi hapus di sini
+      _deleteProduct(context, id);
+    },
+    child: Container(
+      padding: const EdgeInsets.all(4),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+        boxShadow: [BoxShadow(blurRadius: 2, color: Colors.black26)], // Tambah shadow dikit biar cakep
+      ),
+      child: const Icon(Icons.delete, color: Colors.red, size: 16),
+    ),
+  ),
+),
             ],
           ),
         ),
