@@ -15,12 +15,16 @@ class _ProductListScreenState extends State<ProductListScreen> {
   final _supabase = Supabase.instance.client;
   String _userName = "...";
   String _initial = "";
-  String _selectedCategory = "All"; // Default kategori yang terpilih
+  
+  List<String> _categories = ["All"];
+  String _selectedCategory = "All"; 
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _loadUserProfile();
+    _loadCategories();
   }
 
   Future<void> _loadUserProfile() async {
@@ -45,17 +49,48 @@ class _ProductListScreenState extends State<ProductListScreen> {
     }
   }
 
+  Future<void> _loadCategories() async {
+  try {
+    // Ambil data dari tabel 'kategori'
+    final data = await _supabase.from('kategori').select('namakategori');
+    
+    final List<String> fetchedCategories = ["All"];
+    for (var item in data) {
+      fetchedCategories.add(item['namakategori']);
+    }
+
+    setState(() {
+      _categories = fetchedCategories;
+    });
+  } catch (e) {
+    debugPrint("Error loading categories: $e");
+  }
+}
+
   // Di dalam class _ProductListScreenState
 Future<List<Map<String, dynamic>>> _fetchProducts() async {
   try {
-    var query = _supabase.from('produk').select('*, kategori(namakategori)');
-    
-    // Filter berdasarkan kategori jika bukan "All"
+    // 1. Ambil query dasar dari tabel produk
+    var query = _supabase.from('produk').select('*, kategori(*)');
+
+    // 2. Jika kategori yang dipilih bukan "All", lakukan pemfilteran
     if (_selectedCategory != "All") {
+      // Kita memfilter kolom 'kategoriid' di tabel produk
+      // agar sesuai dengan namakategori yang dipilih user
       query = query.eq('kategori.namakategori', _selectedCategory);
     }
 
     final data = await query;
+    
+    // 3. Filter data di sisi client jika menggunakan join query
+    // Ini memastikan hanya produk yang kategorinya benar-benar cocok yang tampil
+    if (_selectedCategory != "All") {
+      return List<Map<String, dynamic>>.from(
+        data.where((item) => item['kategori'] != null && 
+                            item['kategori']['namakategori'] == _selectedCategory)
+      );
+    }
+
     return List<Map<String, dynamic>>.from(data);
   } catch (e) {
     debugPrint("Error fetching products: $e");
@@ -151,16 +186,11 @@ Future<List<Map<String, dynamic>>> _fetchProducts() async {
               decoration: BoxDecoration(
                 color: Colors.grey[100],
                 borderRadius: BorderRadius.circular(30),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color.fromARGB(255, 53, 53, 53),
-                    blurRadius: 5,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
               ),
-              child: const TextField(
-                decoration: InputDecoration(
+              child: TextField(
+                controller: _searchController,
+                onChanged: (value) => setState(() {}), // Refresh saat ngetik
+                decoration: const InputDecoration(
                   hintText: "Cari nama barang.....",
                   hintStyle: TextStyle(color: Colors.grey),
                   prefixIcon: Icon(Icons.search, color: Colors.grey),
@@ -171,23 +201,16 @@ Future<List<Map<String, dynamic>>> _fetchProducts() async {
             ),
             const SizedBox(height: 25),
 
-            // 3. Kategori Produk (Horizontal List)
             SizedBox(
-              height: 45,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                children: [
-                  _buildCategoryItem("All"),
-                  _buildCategoryItem("Buku"),
-                  _buildCategoryItem("Pensil"),
-                  _buildCategoryItem("Bolpoint"),
-                  _buildCategoryItem("Crayon"),
-                  _buildCategoryItem("Penghapus"),
-                  _buildCategoryItem("Penggaris"),
-                  _buildCategoryItem("Lainnya"), 
-                ],
-              ),
-            ),
+  height: 45,
+  child: ListView.builder( // Gunakan .builder
+    scrollDirection: Axis.horizontal,
+    itemCount: _categories.length, // Sesuai jumlah kategori di DB
+    itemBuilder: (context, index) {
+      return _buildCategoryItem(_categories[index]);
+    },
+  ),
+),
            // GANTI GridView lama dengan FutureBuilder ini
             const SizedBox(height: 25),
             FutureBuilder<List<Map<String, dynamic>>>(
