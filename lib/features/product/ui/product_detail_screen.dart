@@ -38,9 +38,30 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _isReadOnly = widget.product['role'] == 'petugas';
+    _checkUserRole(); // Ambil role dari auth
     _initializeData();
     _loadKategori();
+  }
+
+  // Fungsi untuk mengambil role user dari Supabase auth
+  Future<void> _checkUserRole() async {
+    try {
+      // Ambil user data dari auth session
+      final user = supabase.auth.currentUser;
+      final role = user?.userMetadata?['role'] as String? ?? 'petugas';
+      
+      debugPrint("User role from auth: $role");
+      
+      setState(() {
+        _isReadOnly = role.toLowerCase() == 'petugas'; // Petugas = read-only, Admin = bisa edit
+      });
+    } catch (e) {
+      debugPrint("Error getting user role: $e");
+      // Default ke read-only jika error
+      setState(() {
+        _isReadOnly = true;
+      });
+    }
   }
 
   Future<void> _loadKategori() async {
@@ -53,7 +74,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       if (mounted) {
         setState(() {
           _kategoriList = List<Map<String, dynamic>>.from(response);
-          // Sync id kategori dari data produk jika ada
           if (_selectedKategoriId == null && widget.product['kategoriid'] != null) {
             _selectedKategoriId = widget.product['kategoriid'];
           }
@@ -85,6 +105,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Future<void> _pickImage() async {
+    // Hanya admin yang bisa edit gambar
+    if (_isReadOnly) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Hanya admin yang dapat mengubah gambar"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+    
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
     if (image != null) {
       if (kIsWeb) {
@@ -124,23 +157,33 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Future<void> _updateProduct() async {
+    // Hanya admin yang bisa update
+    if (_isReadOnly) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Hanya admin yang dapat mengupdate produk"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+    
     if (_isSaving) return;
 
     try {
       setState(() => _isSaving = true);
 
-      // Validasi sederhana
       if (_namaController.text.isEmpty || _selectedKategoriId == null) {
         throw "Nama dan Kategori harus diisi";
       }
 
-      // 1. Upload gambar jika ada yang baru
       String? finalImageUrl = _currentImageUrl;
       if (_selectedImageFile != null || _selectedImageBytes != null) {
         finalImageUrl = await _uploadImage();
       }
 
-      // 2. Update ke Supabase
       await supabase.from('produk').update({
         'namaproduk': _namaController.text.trim(),
         'harga': double.tryParse(_hargaController.text) ?? 0,
@@ -153,7 +196,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Produk berhasil diperbarui"), backgroundColor: AppColors.primaryPurple)
         );
-        Navigator.pop(context, true); // Kirim 'true' agar ListProduk refresh
+        Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
@@ -168,6 +211,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint("Current user can edit: ${!_isReadOnly}");
+    
     final double screenWidth = MediaQuery.of(context).size.width;
     const double imageSize = 180.0;
 
@@ -185,7 +230,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Area Gambar
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 30),
@@ -290,6 +334,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return TextFormField(
       controller: controller,
       enabled: !_isReadOnly,
+      readOnly: _isReadOnly,
       keyboardType: isNumber ? TextInputType.number : TextInputType.text,
       decoration: _inputDecoration(label, icon),
     );
@@ -303,6 +348,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(15),
         borderSide: const BorderSide(color: AppColors.primaryPurple, width: 2),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(15),
+        borderSide: BorderSide(color: Colors.grey.shade400),
+      ),
+      disabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(15),
+        borderSide: BorderSide(color: Colors.grey.shade300),
       ),
     );
   }
