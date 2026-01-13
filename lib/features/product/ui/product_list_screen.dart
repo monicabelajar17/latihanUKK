@@ -1,3 +1,5 @@
+
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/app_colors.dart';
@@ -306,7 +308,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
         final result = await Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => ProductDetailScreen(product: item),
+            builder: (context) => ProductDetailScreen(product: item, userRole: widget.role,),
           ),
         );
 
