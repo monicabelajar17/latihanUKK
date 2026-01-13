@@ -11,26 +11,33 @@ class LoginScreen extends StatefulWidget { // Ubah ke StatefulWidget agar bisa p
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  // 1. Tambahkan Controller untuk mengambil input
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  
   bool _isLoading = false;
+  // 1. Tambahkan variabel state untuk mengontrol visibilitas password
+  bool _obscureText = true; 
 
-  // 2. Fungsi Login & Cek Role ke Supabase
   Future<void> _handleLogin() async {
+    // Validasi sederhana sebelum ke server
+    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Email dan password tidak boleh kosong"), backgroundColor: Colors.orange),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
     
     try {
       final supabase = Supabase.instance.client;
 
-      // Auth login
       final AuthResponse res = await supabase.auth.signInWithPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
 
       if (res.user != null) {
-        // Ambil data role dari tabel 'profiles' (sesuaikan nama tabel Anda)
         final data = await supabase
             .from('users')
             .select('role')
@@ -41,7 +48,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
         if (!mounted) return;
 
-        // Navigasi berdasarkan role
         if (role.toLowerCase() == 'admin') {
           Navigator.pushReplacementNamed(context, '/admin_product');
         } else {
@@ -49,12 +55,16 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       }
     } on AuthException catch (error) {
+      // 2. Tampilkan pesan kesalahan spesifik jika email/password salah
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.message), backgroundColor: Colors.red),
+        const SnackBar(
+          content: Text("Terjadi kesalahan input email/password"), 
+          backgroundColor: Colors.red
+        ),
       );
     } catch (error) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Terjadi kesalahan tak terduga"), backgroundColor: Colors.red),
+        const SnackBar(content: Text("Terjadi kesalahan jaringan"), backgroundColor: Colors.red),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -68,6 +78,7 @@ class _LoginScreenState extends State<LoginScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
+            // ... (Bagian Header Logo tetap sama)
             Container(
               height: MediaQuery.of(context).size.height * 0.45,
               width: double.infinity,
@@ -87,7 +98,6 @@ class _LoginScreenState extends State<LoginScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 30),
               child: Column(
                 children: [
-                  // Masukkan controller ke textfield
                   _buildTextField(
                     label: "Email", 
                     hint: "Masukkan Email", 
@@ -97,7 +107,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   _buildTextField(
                     label: "Password", 
                     hint: "Masukkan Password", 
-                    isPassword: true,
+                    isPassword: true, // Beritahu widget ini adalah field password
                     controller: _passwordController
                   ),
                   const SizedBox(height: 40),
@@ -108,11 +118,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primaryPurple,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      // Tampilkan loading jika sedang proses
                       onPressed: _isLoading ? null : _handleLogin,
                       child: _isLoading 
                         ? const CircularProgressIndicator(color: Colors.white)
@@ -131,10 +138,11 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  // 3. Modifikasi fungsi helper _buildTextField
   Widget _buildTextField({
     required String label, 
     required String hint, 
-    required TextEditingController controller, // Tambahkan parameter controller
+    required TextEditingController controller,
     bool isPassword = false
   }) {
     return Column(
@@ -143,11 +151,26 @@ class _LoginScreenState extends State<LoginScreen> {
         Text(label, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryPurple)),
         const SizedBox(height: 8),
         TextField(
-          controller: controller, // Hubungkan di sini
-          obscureText: isPassword,
+          controller: controller,
+          // Gunakan state _obscureText hanya jika isPassword bernilai true
+          obscureText: isPassword ? _obscureText : false,
           decoration: InputDecoration(
             hintText: hint,
-            suffixIcon: isPassword ? const Icon(Icons.visibility_off_outlined) : null,
+            // Tambahkan tombol mata (IconButton) jika field adalah password
+            suffixIcon: isPassword 
+              ? IconButton(
+                  icon: Icon(
+                    _obscureText ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                    color: AppColors.primaryPurple,
+                  ),
+                  onPressed: () {
+                    // Toggle status sembunyi/lihat password
+                    setState(() {
+                      _obscureText = !_obscureText;
+                    });
+                  },
+                ) 
+              : null,
             contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             enabledBorder: OutlineInputBorder(
