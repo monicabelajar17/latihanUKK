@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:path/path.dart' as path;
 import '../../../core/constants/app_colors.dart';
 import 'package:flutter/foundation.dart';
+import 'package:intl/intl.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final Map<String, dynamic> product;
@@ -36,6 +37,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Uint8List? _selectedImageBytes;
   bool _isUploadingImage = false;
   bool _isSaving = false;
+
+  String _formatCurrency(dynamic price) {
+  double value = double.tryParse(price.toString()) ?? 0;
+  final formatter = NumberFormat.currency(
+    locale: 'id_ID',
+    symbol: '', // Kosongkan simbol karena label sudah ada
+    decimalDigits: 0,
+  );
+  return formatter.format(value);
+}
   
   late bool _isReadOnly;
   List<Map<String, dynamic>> _kategoriList = [];
@@ -73,7 +84,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   void _initializeData() {
     setState(() {
       _namaController = TextEditingController(text: widget.product['namaproduk']?.toString() ?? "");
-      _hargaController = TextEditingController(text: widget.product['harga']?.toString() ?? "0");
+      String hargaAwal = _formatCurrency(widget.product['harga'] ?? 0);
+    _hargaController = TextEditingController(text: hargaAwal);
       _stokController = TextEditingController(text: widget.product['stok']?.toString() ?? "0");
       _selectedKategoriId = widget.product['kategoriid'];
       _currentImageUrl = widget.product['gambar'];
@@ -148,14 +160,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         finalImageUrl = await _uploadImage();
       }
 
+      String hargaBersih = _hargaController.text.replaceAll(RegExp(r'[^0-9]'), '');
+
       // 2. Update ke Supabase
       await supabase.from('produk').update({
-        'namaproduk': _namaController.text.trim(),
-        'harga': double.tryParse(_hargaController.text) ?? 0,
-        'stok': int.tryParse(_stokController.text) ?? 0,
-        'kategoriid': _selectedKategoriId,
-        'gambar': finalImageUrl,
-      }).eq('produkid', widget.product['produkid']);
+  'namaproduk': _namaController.text.trim(),
+  'harga': double.tryParse(hargaBersih) ?? 0, // Kirim harga tanpa titik ke DB
+  'stok': int.tryParse(_stokController.text) ?? 0,
+  'kategoriid': _selectedKategoriId,
+  'gambar': finalImageUrl,
+}).eq('produkid', widget.product['produkid']);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

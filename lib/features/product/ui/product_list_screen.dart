@@ -1,5 +1,5 @@
 
-
+import 'package:intl/intl.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/app_colors.dart';
@@ -19,6 +19,15 @@ class _ProductListScreenState extends State<ProductListScreen> {
   final _supabase = Supabase.instance.client;
   String _userName = "...";
   String _initial = "";
+  String _formatCurrency(dynamic price) {
+  double value = double.tryParse(price.toString()) ?? 0;
+  final formatter = NumberFormat.currency(
+    locale: 'id_ID',
+    symbol: 'Rp. ',
+    decimalDigits: 0,
+  );
+  return formatter.format(value);
+}
   
   List<String> _categories = ["All"];
   String _selectedCategory = "All"; 
@@ -261,7 +270,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
                       item: item,
                       id: item['produkid'],
                       title: item['namaproduk'] ?? 'Tanpa Nama',
-                      price: "Rp. ${item['harga'] ?? 0}",
+                      price: _formatCurrency(item['harga']),
                       stock: "${item['stok'] ?? 0}",
                       imageUrl: item['gambar'],
                     );

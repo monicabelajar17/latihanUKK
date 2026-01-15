@@ -15,7 +15,6 @@ void main() async {
     anonKey: 'sb_publishable_0qAEpWJzIXds-vl2m2QbmA_JQG_jwZi',
   );
 
-
   runApp(const MyApp());
 }
 

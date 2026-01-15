@@ -63,16 +63,17 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       }
     } on AuthException catch (error) {
-      setState(() {
-      // Cek pesan error dari Supabase
-      if (error.message.contains('Invalid login credentials')) {
-        _emailError = "Email atau password salah";
-        _passwordError = "Email atau password salah";
-      } else {
-        _emailError = "Terjadi kesalahan: ${error.message}";
-      }
-    });
-  } catch (error) {
+  setState(() {
+    // Cek jika error disebabkan oleh kredensial yang salah
+    if (error.message.contains('Invalid login credentials')) {
+      _emailError = null; // Kosongkan error email agar tidak merah
+      _passwordError = "Password salah"; // Set pesan spesifik sesuai permintaan
+    } else {
+      // Jika error lain (misal user tidak ditemukan), tetap tampilkan di email atau general
+      _emailError = "Terjadi kesalahan: ${error.message}";
+    }
+  });
+} catch (error) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text("Terjadi kesalahan jaringan"), backgroundColor: Colors.red),
     );
@@ -152,39 +153,44 @@ class _LoginScreenState extends State<LoginScreen> {
 
   // 3. Modifikasi fungsi helper _buildTextField
   Widget _buildTextField({
-    required String label, 
-    required String hint, 
-    required TextEditingController controller,
-    bool isPassword = false,
-    String? errorText,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryPurple)),
-        const SizedBox(height: 8),
-        TextField(
-          controller: controller,
-          // Gunakan state _obscureText hanya jika isPassword bernilai true
-          obscureText: isPassword ? _obscureText : false,
-          decoration: InputDecoration(
-            hintText: hint,
-            errorText: errorText,
-            // Tambahkan tombol mata (IconButton) jika field adalah password
-            suffixIcon: isPassword 
-              ? IconButton(
-                  icon: Icon(
-                    _obscureText ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                    color: AppColors.primaryPurple,
-                  ),
-                  onPressed: () {
-                    // Toggle status sembunyi/lihat password
-                    setState(() {
-                      _obscureText = !_obscureText;
-                    });
-                  },
-                ) 
-              : null,
+  required String label, 
+  required String hint, 
+  required TextEditingController controller,
+  bool isPassword = false,
+  String? errorText,
+}) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(label, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryPurple)),
+      const SizedBox(height: 8),
+      TextField(
+        controller: controller,
+        obscureText: isPassword ? _obscureText : false,
+        // TAMBAHKAN INI: Menghapus error saat user mengetik
+        onChanged: (value) {
+          if (errorText != null) {
+            setState(() {
+              if (isPassword) {
+                _passwordError = null;
+              } else {
+                _emailError = null;
+              }
+            });
+          }
+        },
+        decoration: InputDecoration(
+          hintText: hint,
+          errorText: errorText,
+          suffixIcon: isPassword 
+            ? IconButton(
+                icon: Icon(
+                  _obscureText ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                  color: AppColors.primaryPurple,
+                ),
+                onPressed: () => setState(() => _obscureText = !_obscureText),
+              ) 
+            : null,
             contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             enabledBorder: OutlineInputBorder(
