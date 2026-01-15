@@ -13,19 +13,27 @@ class LoginScreen extends StatefulWidget { // Ubah ke StatefulWidget agar bisa p
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  String? _emailError;
+  String? _passwordError;
   
   bool _isLoading = false;
   // 1. Tambahkan variabel state untuk mengontrol visibilitas password
   bool _obscureText = true; 
 
   Future<void> _handleLogin() async {
-    // Validasi sederhana sebelum ke server
-    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Email dan password tidak boleh kosong"), backgroundColor: Colors.orange),
-      );
-      return;
-    }
+    setState(() {
+    _emailError = null;
+    _passwordError = null;
+  });
+
+  if (_emailController.text.isEmpty) {
+    setState(() => _emailError = "Email tidak boleh kosong");
+    return;
+  }
+  if (_passwordController.text.isEmpty) {
+    setState(() => _passwordError = "Password tidak boleh kosong");
+    return;
+  }
 
     setState(() => _isLoading = true);
     
@@ -55,20 +63,22 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       }
     } on AuthException catch (error) {
-      // 2. Tampilkan pesan kesalahan spesifik jika email/password salah
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Terjadi kesalahan input email/password"), 
-          backgroundColor: Colors.red
-        ),
-      );
-    } catch (error) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Terjadi kesalahan jaringan"), backgroundColor: Colors.red),
-      );
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+      setState(() {
+      // Cek pesan error dari Supabase
+      if (error.message.contains('Invalid login credentials')) {
+        _emailError = "Email atau password salah";
+        _passwordError = "Email atau password salah";
+      } else {
+        _emailError = "Terjadi kesalahan: ${error.message}";
+      }
+    });
+  } catch (error) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Terjadi kesalahan jaringan"), backgroundColor: Colors.red),
+    );
+  } finally {
+    if (mounted) setState(() => _isLoading = false);
+  }
   }
 
   @override
@@ -101,14 +111,16 @@ class _LoginScreenState extends State<LoginScreen> {
                   _buildTextField(
                     label: "Email", 
                     hint: "Masukkan Email", 
-                    controller: _emailController
+                    controller: _emailController,
+                    errorText: _emailError,
                   ),
                   const SizedBox(height: 20),
                   _buildTextField(
                     label: "Password", 
                     hint: "Masukkan Password", 
                     isPassword: true, // Beritahu widget ini adalah field password
-                    controller: _passwordController
+                    controller: _passwordController,
+                    errorText: _passwordError,
                   ),
                   const SizedBox(height: 40),
                   
@@ -143,7 +155,8 @@ class _LoginScreenState extends State<LoginScreen> {
     required String label, 
     required String hint, 
     required TextEditingController controller,
-    bool isPassword = false
+    bool isPassword = false,
+    String? errorText,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -156,6 +169,7 @@ class _LoginScreenState extends State<LoginScreen> {
           obscureText: isPassword ? _obscureText : false,
           decoration: InputDecoration(
             hintText: hint,
+            errorText: errorText,
             // Tambahkan tombol mata (IconButton) jika field adalah password
             suffixIcon: isPassword 
               ? IconButton(
@@ -177,6 +191,15 @@ class _LoginScreenState extends State<LoginScreen> {
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(color: AppColors.primaryPurple),
             ),
+
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Colors.red),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Colors.red, width: 2)
+          ),
           ),
         ),
       ],
