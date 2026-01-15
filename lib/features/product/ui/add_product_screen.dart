@@ -58,77 +58,97 @@ class _AddProductScreenState extends State<AddProductScreen> {
   }
 
   Future<void> _saveProduct() async {
-    // 1. Validasi Input
-    if (_namaController.text.isEmpty || _hargaController.text.isEmpty || _selectedKategoriId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Mohon lengkapi data (Nama, Harga, dan Kategori)")),
-      );
-      return;
-    }
+  // 1. Validasi Input
+  if (_namaController.text.isEmpty || _hargaController.text.isEmpty || _selectedKategoriId == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Mohon lengkapi data (Nama, Harga, dan Kategori)")),
+    );
+    return;
+  }
 
-    setState(() => _isLoading = true);
+  setState(() => _isLoading = true);
 
-    try {
+  try {
+    String namaBaru = _namaController.text.trim();
+    int inputStok = int.tryParse(_stokController.text) ?? 0;
+    double inputHarga = double.tryParse(_hargaController.text) ?? 0;
+
+    // 2. CEK APAKAH PRODUK SUDAH ADA (Berdasarkan Nama)
+    final existingProduct = await _supabase
+        .from('produk')
+        .select()
+        .eq('namaproduk', namaBaru)
+        .maybeSingle(); // Mengambil satu data jika ada
+
+    if (existingProduct != null) {
+      // --- LOGIKA UPDATE STOK ---
+      int stokLama = existingProduct['stok'] ?? 0;
+      int idProduk = existingProduct['produkid'];
+
+      await _supabase.from('produk').update({
+        'stok': stokLama + inputStok, // Tambahkan stok lama dengan input baru
+        'harga': inputHarga,         // Opsional: Update harga ke yang terbaru
+      }).eq('produkid', idProduk);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Produk '$namaBaru' sudah ada. Stok berhasil ditambahkan!"),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } else {
+      // --- LOGIKA TAMBAH DATA BARU (INSERT) ---
       String? imageUrl;
 
-      // 2. Proses Upload Foto (Sama seperti di Detail Produk)
+      // Proses Upload Foto (hanya jika tambah produk baru)
       if (_selectedImageFile != null || _selectedImageBytes != null) {
-        // Buat nama file unik agar tidak bentrok
         final String fileName = 'prod_${DateTime.now().millisecondsSinceEpoch}.jpg';
-        final String path = fileName; // Simpan di root bucket 'Produk Image'
-
         if (kIsWeb && _selectedImageBytes != null) {
-          // Upload untuk versi WEB
           await _supabase.storage.from('Produk Image').uploadBinary(
-            path,
+            fileName,
             _selectedImageBytes!,
-            fileOptions: const FileOptions(
-              upsert: true, 
-              contentType: 'image/jpeg'
-            ),
+            fileOptions: const FileOptions(upsert: true, contentType: 'image/jpeg'),
           );
         } else if (_selectedImageFile != null) {
-          // Upload untuk versi MOBILE (Android/iOS)
           await _supabase.storage.from('Produk Image').upload(
-            path,
+            fileName,
             _selectedImageFile!,
-            fileOptions: const FileOptions(
-              upsert: true, 
-              contentType: 'image/jpeg'
-            ),
+            fileOptions: const FileOptions(upsert: true, contentType: 'image/jpeg'),
           );
         }
-
-        // 3. Ambil URL Publik setelah berhasil upload
-        imageUrl = _supabase.storage.from('Produk Image').getPublicUrl(path);
+        imageUrl = _supabase.storage.from('Produk Image').getPublicUrl(fileName);
       }
 
-      // 4. Simpan ke Tabel Produk di Database
       await _supabase.from('produk').insert({
-        'namaproduk': _namaController.text.trim(),
-        'harga': double.tryParse(_hargaController.text) ?? 0,
-        'stok': int.tryParse(_stokController.text) ?? 0,
+        'namaproduk': namaBaru,
+        'harga': inputHarga,
+        'stok': inputStok,
         'kategoriid': _selectedKategoriId,
-        'gambar': imageUrl, // Link foto masuk ke kolom gambar
+        'gambar': imageUrl,
       });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Produk & Foto berhasil ditambahkan!"), backgroundColor: Colors.green),
-        );
-        Navigator.pop(context, true); // Kembali dan refresh list
-      }
-    } catch (e) {
-      debugPrint("Error detail: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Gagal menyimpan: $e"), backgroundColor: Colors.red),
+          const SnackBar(content: Text("Produk baru berhasil ditambahkan!"), backgroundColor: Colors.green),
         );
       }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
     }
+
+    if (mounted) Navigator.pop(context, true);
+
+  } catch (e) {
+    debugPrint("Error: $e");
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Terjadi kesalahan: $e"), backgroundColor: Colors.red),
+      );
+    }
+  } finally {
+    if (mounted) setState(() => _isLoading = false);
   }
+}
   @override
   Widget build(BuildContext context) {
     const double imageSize = 180.0;

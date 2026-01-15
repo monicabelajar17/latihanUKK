@@ -170,7 +170,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
               },
               backgroundColor: AppColors.primaryPurple,
               shape: const CircleBorder(),
-              child: const Icon(Icons.add, color: Colors.pinkAccent, size: 30),
+              child: const Icon(Icons.add, color: Colors.white, size: 30),
             )
           : null,
       backgroundColor: Colors.white,
